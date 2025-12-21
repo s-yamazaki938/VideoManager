@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Manager Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            /* ライトモード変数 */
+            --bg-color: #e0e5ec;
+            --text-color: #44474b;
+            --nm-flat: 9px 9px 16px #bcbfc5, -9px -9px 16px #ffffff;
+            --nm-inset: inset 6px 6px 12px #bcbfc5, inset -6px -6px 12px #ffffff;
+            --accent-color: #4b7cf3;
+            --danger-color: #ff7675;
+        }
+
+        [data-theme="dark"] {
+            /* ダークモード変数 */
+            --bg-color: #2d3436;
+            --text-color: #dfe6e9;
+            --nm-flat: 9px 9px 16px #1e2324, -9px -9px 16px #3c4548;
+            --nm-inset: inset 6px 6px 12px #1e2324, inset -6px -6px 12px #3c4548;
+            --accent-color: #74b9ff;
+            --danger-color: #ff7675;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* ニューモーフィズム共通スタイル */
+        .nm-card { background: var(--bg-color); border-radius: 20px; box-shadow: var(--nm-flat); padding: 20px; transition: 0.3s; }
+        .nm-input { background: var(--bg-color); border: none; border-radius: 12px; box-shadow: var(--nm-inset); padding: 12px; outline: none; color: var(--text-color); width: 100%; box-sizing: border-box; }
+        .nm-btn { background: var(--bg-color); border: none; border-radius: 12px; box-shadow: var(--nm-flat); padding: 10px 20px; cursor: pointer; transition: 0.2s; color: var(--text-color); font-weight: bold; white-space: nowrap; }
+        .nm-btn:active { box-shadow: var(--nm-inset); }
+
+        #sidebar { width: 240px; padding: 20px; display: none; }
+        #main-content { flex: 1; padding: 20px; display: none; }
+        #login-screen { width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.8em; }
+        .td-url { max-width: 250px; word-break: break-all; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-val { font-size: 2em; font-weight: bold; color: var(--accent-color); }
+        
+        hr { border: none; height: 1px; background: rgba(0,0,0,0.1); margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="nm-card" style="width: 320px;">
+            <h2 style="text-align: center;">Login</h2>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="login-id" class="nm-input" placeholder="User ID">
+                <input type="password" id="login-pw" class="nm-input" placeholder="Password">
+                <button class="nm-btn" id="btn-login" style="color: var(--accent-color);">Login</button>
+            </div>
+        </div>
+    </div>
+
+    <aside id="sidebar">
+        <div class="nm-card" style="height: calc(100vh - 40px); position: sticky; top: 20px;">
+            <h3 style="text-align: center;">Menu</h3>
+            <nav style="display: flex; flex-direction: column; gap: 15px;">
+                <button class="nm-btn" onclick="showScreen('dashboard')">🏠 ダッシュボード</button>
+                <button class="nm-btn" onclick="showScreen('video')">📹 動画一覧</button>
+                <button class="nm-btn" onclick="showScreen('actor')">👤 出演者マスタ</button>
+                <button class="nm-btn" onclick="showScreen('category')">📂 カテゴリマスタ</button>
+                <hr>
+                <button class="nm-btn" id="toggle-theme">🌓 テーマ切替</button>
+            </nav>
+        </div>
+    </aside>
+
+    <main id="main-content">
+        <header class="header">
+            <h2 id="screen-title">Dashboard</h2>
+            <div>
+                <span id="display-user" style="font-size: 0.9em; margin-right: 10px;"></span>
+                <button class="nm-btn" id="btn-logout" style="color: var(--danger-color); font-size: 0.8em;">Logout</button>
+            </div>
+        </header>
+
+        <section id="dashboard-screen" class="screen">
+            <div class="stats-grid">
+                <div class="nm-card"><div>総動画数</div><div id="stat-video" class="stat-val">0</div></div>
+                <div class="nm-card"><div>登録出演者</div><div id="stat-actor" class="stat-val">0</div></div>
+                <div class="nm-card"><div>総カテゴリ</div><div id="stat-cat" class="stat-val">0</div></div>
+            </div>
+            <div class="nm-card">
+                <h4>直近の登録動画 (最新5件)</h4>
+                <table id="table-recent">
+                    <thead><tr><th>URL</th><th>登録日時</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="video-screen" class="screen">
+            <div class="nm-card" style="margin-bottom: 25px;">
+                <h4 id="video-form-title">新規動画登録</h4>
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <div><input type="text" id="new-url" class="nm-input" placeholder="https://..."></div>
+                    <div><select id="select-actor" class="nm-input"></select></div>
+                    <div><select id="select-category" class="nm-input"></select></div>
+                    <div style="display: flex; gap: 5px;">
+                        <button class="nm-btn" id="btn-add-video">追加</button>
+                        <button class="nm-btn" id="btn-cancel-video" style="display:none; color: #888;">取消</button>
+                    </div>
+                </div>
+                <hr>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="search-box" class="nm-input" placeholder="URLで検索..." style="flex:1;">
+                    <select id="filter-actor" class="nm-input" style="width: 200px;"><option value="">全出演者</option></select>
+                </div>
+            </div>
+            <div class="nm-card" style="overflow-x: auto;">
+                <table id="table-video">
+                    <thead>
+                        <tr><th>URL</th><th>出演者</th><th>カテゴリ</th><th>作成者</th><th>作成日時</th><th>更新者</th><th>更新日時</th><th>操作</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="actor-screen" class="screen">
+            <div class="nm-card" style="margin-bottom: 25px;">
+                <h4 id="actor-form-title">出演者登録</h4>
+                <div style="display: flex; gap: 10px; align-items: end;">
+                    <input type="text" id="new-actor-name" class="nm-input" placeholder="出演者名を入力">
+                    <button class="nm-btn" id="btn-add-actor">登録</button>
+                    <button class="nm-btn" id="btn-cancel-actor" style="display:none; color: #888;">取消</button>
+                </div>
+            </div>
+            <div class="nm-card">
+                <table id="table-actor">
+                    <thead><tr><th>出演者名</th><th>登録日時</th><th>登録者</th><th>操作</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="category-screen" class="screen">
+            <div class="nm-card">
+                <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 15px;">※カテゴリマスタは閲覧専用です</p>
+                <table id="table-category">
+                    <thead><tr><th>カテゴリ名</th><th>最終更新</th><th>更新者</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // --- 設定 ---
+        const SB_URL = 'https://tpemermrrxgdxppzewpn.supabase.co';
+        const SB_KEY = 'sb_publishable_zr76EeMU58HUMoJJivdDoQ_Hflm3xX8';
+        const db = supabase.createClient(SB_URL, SB_KEY);
+
+        let currentUser = null;
+        let userCache = {}, actors = {}, cats = {};
+        let editingVideoId = null, editingActorId = null;
+        let allVideos = [];
+
+        const fmtDate = (s) => s ? new Date(s).toLocaleString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
+
+        // --- テーマ切替 ---
+        document.getElementById('toggle-theme').onclick = () => {
+            const theme = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', theme);
+        };
+
+        // --- データ初期化 ---
+        async function initData() {
+            const [u, a, c] = await Promise.all([
+                db.from('m_user').select('id, user_id'),
+                db.from('m_actor').select('*'),
+                db.from('m_category').select('*')
+            ]);
+            userCache = Object.fromEntries(u.data.map(i => [i.id, i.user_id]));
+            actors = Object.fromEntries(a.data.map(i => [i.id, i.actor_name]));
+            cats = Object.fromEntries(c.data.map(i => [i.id, i.category_name]));
+
+            // プルダウン更新
+            const actorOpts = a.data.map(i => `<option value="${i.id}">${i.actor_name}</option>`).join('');
+            document.getElementById('select-actor').innerHTML = actorOpts;
+            document.getElementById('filter-actor').innerHTML = '<option value="">全出演者</option>' + actorOpts;
+            document.getElementById('select-category').innerHTML = c.data.map(i => `<option value="${i.id}">${i.category_name}</option>`).join('');
+        }
+
+        // --- 画面遷移 ---
+        window.showScreen = async (id) => {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id + '-screen').classList.add('active');
+            document.getElementById('screen-title').innerText = id.charAt(0).toUpperCase() + id.slice(1);
+            
+            await initData();
+            if(id === 'dashboard') loadDashboard();
+            if(id === 'video') loadVideos();
+            if(id === 'actor') loadActors();
+            if(id === 'category') loadCategories();
+        };
+
+        // --- 動画機能 (検索/重複チェック/編集) ---
+        async function loadVideos() {
+            const { data } = await db.from('url').select('*').order('created_at', {ascending: false});
+            allVideos = data || [];
+            filterVideos();
+        }
+
+        function filterVideos() {
+            const word = document.getElementById('search-box').value.toLowerCase();
+            const actorId = document.getElementById('filter-actor').value;
+            const filtered = allVideos.filter(v => v.url.toLowerCase().includes(word) && (!actorId || v.actor_id == actorId));
+            
+            document.querySelector('#table-video tbody').innerHTML = filtered.map(v => `
+                <tr>
+                    <td class="td-url"><a href="${v.url}" target="_blank" style="color: var(--accent-color);">${v.url}</a></td>
+                    <td>${actors[v.actor_id] || '-'}</td><td>${cats[v.category_id] || '-'}</td>
+                    <td>${userCache[v.creator_id] || '-'}</td><td>${fmtDate(v.created_at)}</td>
+                    <td>${userCache[v.updater_id] || '-'}</td><td>${fmtDate(v.updated_at)}</td>
+                    <td>
+                        <button class="nm-btn" style="padding:5px 8px;" onclick="editVideo(${v.id},'${v.url}',${v.actor_id},${v.category_id})">編集</button>
+                        <button class="nm-btn" style="padding:5px 8px; color:var(--danger-color);" onclick="deleteVideo(${v.id})">削除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        document.getElementById('search-box').oninput = filterVideos;
+        document.getElementById('filter-actor').onchange = filterVideos;
+
+        document.getElementById('btn-add-video').onclick = async () => {
+            const url = document.getElementById('new-url').value;
+            if(!url) return;
+            if(!editingVideoId) { // 新規時のみ重複チェック
+                const { data } = await db.from('url').select('id').eq('url', url).maybeSingle();
+                if(data) return alert('このURLは既に登録されています。');
+            }
+            const now = new Date().toISOString();
+            const payload = { url, actor_id: document.getElementById('select-actor').value, category_id: document.getElementById('select-category').value, updated_at: now, updater_id: currentUser.id };
+            
+            if(editingVideoId) {
+                await db.from('url').update(payload).eq('id', editingVideoId);
+            } else {
+                await db.from('url').insert({...payload, created_at: now, creator_id: currentUser.id});
+            }
+            resetVideoForm(); loadVideos();
+        };
+
+        window.editVideo = (id, url, aid, cid) => {
+            editingVideoId = id;
+            document.getElementById('new-url').value = url;
+            document.getElementById('select-actor').value = aid;
+            document.getElementById('select-category').value = cid;
+            document.getElementById('video-form-title').innerText = "動画情報を編集";
+            document.getElementById('btn-add-video').innerText = "更新";
+            document.getElementById('btn-cancel-video').style.display = "inline-block";
+        };
+
+        window.deleteVideo = async (id) => { if(confirm('動画を削除しますか？')) { await db.from('url').delete().eq('id', id); loadVideos(); } };
+        function resetVideoForm() { editingVideoId = null; document.getElementById('new-url').value = ''; document.getElementById('video-form-title').innerText = "新規動画登録"; document.getElementById('btn-add-video').innerText = "追加"; document.getElementById('btn-cancel-video').style.display = "none"; }
+        document.getElementById('btn-cancel-video').onclick = resetVideoForm;
+
+        // --- 出演者機能 (編集/削除) ---
+        async function loadActors() {
+            const { data } = await db.from('m_actor').select('*').order('created_at', {ascending: false});
+            document.querySelector('#table-actor tbody').innerHTML = data.map(a => `
+                <tr>
+                    <td>${a.actor_name}</td><td>${fmtDate(a.created_at)}</td><td>${userCache[a.creator_id] || '-'}</td>
+                    <td>
+                        <button class="nm-btn" style="padding:5px 8px;" onclick="editActor(${a.id},'${a.actor_name}')">編集</button>
+                        <button class="nm-btn" style="padding:5px 8px; color:var(--danger-color);" onclick="deleteActor(${a.id})">削除</button>
+                    </td>
+                </tr>`).join('');
+        }
+
+        window.editActor = (id, name) => {
+            editingActorId = id;
+            document.getElementById('new-actor-name').value = name;
+            document.getElementById('actor-form-title').innerText = "出演者名を編集";
+            document.getElementById('btn-add-actor').innerText = "更新";
+            document.getElementById('btn-cancel-actor').style.display = "inline-block";
+        };
+
+        document.getElementById('btn-add-actor').onclick = async () => {
+            const name = document.getElementById('new-actor-name').value;
+            if(!name) return;
+            const now = new Date().toISOString();
+            if(editingActorId) {
+                await db.from('m_actor').update({ actor_name: name, updated_at: now, updater_id: currentUser.id }).eq('id', editingActorId);
+            } else {
+                await db.from('m_actor').insert({ actor_name: name, created_at: now, updated_at: now, creator_id: currentUser.id, updater_id: currentUser.id });
+            }
+            resetActorForm(); loadActors();
+        };
+
+        window.deleteActor = async (id) => {
+            if(confirm('出演者を削除しますか？')) {
+                const { error } = await db.from('m_actor').delete().eq('id', id);
+                if(error) alert('この出演者は動画に登録されているため削除できません。'); else loadActors();
+            }
+        };
+        function resetActorForm() { editingActorId = null; document.getElementById('new-actor-name').value = ''; document.getElementById('actor-form-title').innerText = "出演者登録"; document.getElementById('btn-add-actor').innerText = "登録"; document.getElementById('btn-cancel-actor').style.display = "none"; }
+        document.getElementById('btn-cancel-actor').onclick = resetActorForm;
+
+        // --- その他マスタ・ログイン ---
+        async function loadDashboard() {
+            const { data } = await db.from('url').select('*').order('created_at', {ascending: false});
+            document.getElementById('stat-video').innerText = data.length;
+            document.getElementById('stat-actor').innerText = Object.keys(actors).length;
+            document.getElementById('stat-cat').innerText = Object.keys(cats).length;
+            document.getElementById('table-recent').querySelector('tbody').innerHTML = data.slice(0, 5).map(v => `<tr><td class="td-url">${v.url}</td><td>${fmtDate(v.created_at)}</td></tr>`).join('');
+        }
+
+        async function loadCategories() {
+            const { data } = await db.from('m_category').select('*');
+            document.querySelector('#table-category tbody').innerHTML = data.map(c => `<tr><td>${c.category_name}</td><td>${fmtDate(c.updated_at)}</td><td>${userCache[c.updater_id] || '-'}</td></tr>`).join('');
+        }
+
+        document.getElementById('btn-login').onclick = async () => {
+            const id = document.getElementById('login-id').value, pw = document.getElementById('login-pw').value;
+            const { data } = await db.from('m_user').select('*').eq('user_id', id).eq('password', pw).maybeSingle();
+            if(data) {
+                currentUser = data;
+                await db.from('m_user').update({ updated_at: new Date().toISOString() }).eq('id', data.id);
+                document.getElementById('login-screen').style.display='none';
+                document.getElementById('sidebar').style.display='block';
+                document.getElementById('main-content').style.display='block';
+                document.getElementById('display-user').innerText = `User: ${data.user_id}`;
+                showScreen('dashboard');
+            } else { alert('ログインに失敗しました'); }
+        };
+
+        document.getElementById('btn-logout').onclick = () => location.reload();
+    </script>
+</body>
+</html>
