@@ -39,6 +39,12 @@
             transition: 0.3s;
         }
 
+        /* 読み込み中オーバーレイ */
+        #loading-overlay {
+            position: fixed; inset: 0; background: var(--bg-color);
+            display: flex; justify-content: center; align-items: center; z-index: 2000;
+        }
+
         .nm-card { background: var(--bg-color); border-radius: 20px; box-shadow: var(--nm-flat); padding: 20px; transition: 0.3s; }
         .nm-input { background: var(--bg-color); border: none; border-radius: 12px; box-shadow: var(--nm-inset); padding: 12px; outline: none; color: var(--text-color); width: 100%; box-sizing: border-box; }
         .nm-btn { background: var(--bg-color); border: none; border-radius: 12px; box-shadow: var(--nm-flat); padding: 10px 20px; cursor: pointer; transition: 0.2s; color: var(--text-color); font-weight: bold; white-space: nowrap; }
@@ -78,7 +84,6 @@
             td { padding: 10px 15px; text-align: right; border: none; font-size: 0.9em; display: flex; justify-content: space-between; align-items: center; }
             td::before { content: attr(data-label); font-weight: bold; color: var(--sub-text); font-size: 0.85em; margin-right: 10px; }
             td[data-label="Action"] { border-top: 1px solid rgba(0,0,0,0.05); justify-content: flex-end; gap: 10px; }
-            /* スマホ時の登録フォームのレイアウト微調整 */
             #video-screen .nm-card > div[style*="grid-template-columns"] { 
                 grid-template-columns: 1fr !important; 
                 display: flex !important; 
@@ -86,29 +91,20 @@
                 gap: 10px; 
             }
         }
-
-        #login-screen { width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; }
     </style>
 </head>
 <body>
 
-    <div class="mobile-header" id="mobile-nav" style="display:none;">
+    <div id="loading-overlay">
+        <div class="nm-card">Initializing Video Manager...</div>
+    </div>
+
+    <div class="mobile-header" id="mobile-nav">
         <button class="nm-btn" id="btn-menu-open">☰</button>
         <h4 style="margin: 0;">Video Manager</h4>
         <button class="nm-btn" id="toggle-theme-mob" style="padding: 8px;">🌓</button>
     </div>
     <div id="menu-overlay" class="menu-overlay"></div>
-
-    <div id="login-screen">
-        <div class="nm-card" style="width: 320px;">
-            <h2 style="text-align: center;">Login</h2>
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <input type="text" id="login-id" class="nm-input" placeholder="User ID">
-                <input type="password" id="login-pw" class="nm-input" placeholder="Password">
-                <button class="nm-btn" id="btn-login" style="color: var(--accent-color);">Login</button>
-            </div>
-        </div>
-    </div>
 
     <aside id="sidebar">
         <div class="nm-card" style="height: calc(100vh - 40px);">
@@ -129,7 +125,6 @@
             <h2 id="screen-title">Dashboard</h2>
             <div>
                 <span id="display-user"></span>
-                <button class="nm-btn" id="btn-logout" style="color: var(--danger-color); margin-left:10px;">Logout</button>
             </div>
         </header>
 
@@ -193,7 +188,7 @@
     </main>
 
     <script>
-        // PWAサービスワーカーの登録（ダミー登録でインストールを可能にする）
+        // PWAサービスワーカー
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('data:text/javascript;base64,c2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsIGV2ZW50ID0+IHt9KTs=');
@@ -209,6 +204,35 @@
 
         const fmtDate = (s) => s ? new Date(s).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
 
+        // 初期化処理：adminとして自動ログイン
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // adminユーザーを取得
+                const { data: user, error } = await db.from('m_user').select('*').eq('user_id', 'admin').maybeSingle();
+                
+                if (error || !user) {
+                    alert('Error: admin account not found in m_user table.');
+                    return;
+                }
+
+                currentUser = user;
+                document.getElementById('display-user').innerText = `Logged in as: ${currentUser.user_id}`;
+                
+                // 画面要素を表示
+                document.getElementById('loading-overlay').style.display = 'none';
+                document.getElementById('sidebar').style.display = 'block';
+                document.getElementById('main-content').style.display = 'block';
+                if(window.innerWidth <= 768) document.getElementById('mobile-nav').style.display = 'flex';
+
+                // 初期データの読み込み
+                showScreen('dashboard');
+            } catch (e) {
+                console.error(e);
+                alert('Connection Error');
+            }
+        });
+
+        // 共通イベント
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('menu-overlay');
         document.getElementById('btn-menu-open').onclick = () => { sidebar.classList.add('open'); overlay.classList.add('active'); };
@@ -254,15 +278,13 @@
         function filterVideos() {
             const word = document.getElementById('search-box').value.toLowerCase();
             const aid = document.getElementById('filter-actor').value;
-
             const filtered = allVideos.filter(v => {
                 const matchActorSelect = !aid || v.actor_id == aid;
                 const vTitle = (v.video_title || "").toLowerCase();
                 const vUrl = (v.url || "").toLowerCase();
                 const vActor = (actors[v.actor_id] || "").toLowerCase();
                 const vCat = (cats[v.category_id] || "").toLowerCase();
-                const matchKeyword = vTitle.includes(word) || vUrl.includes(word) || vActor.includes(word) || vCat.includes(word);
-                return matchActorSelect && matchKeyword;
+                return matchActorSelect && (vTitle.includes(word) || vUrl.includes(word) || vActor.includes(word) || vCat.includes(word));
             });
 
             document.querySelector('#table-video tbody').innerHTML = filtered.map(v => `
@@ -339,22 +361,6 @@
             const { data } = await db.from('m_category').select('*');
             document.querySelector('#table-category tbody').innerHTML = (data || []).map(c => `<tr><td data-label="Category">${c.category_name}</td><td data-label="Updated">${fmtDate(c.updated_at)}</td><td data-label="By">${userCache[c.updater_id]}</td></tr>`).join('');
         }
-
-        document.getElementById('btn-login').onclick = async () => {
-            const id = document.getElementById('login-id').value, pw = document.getElementById('login-pw').value;
-            const { data } = await db.from('m_user').select('*').eq('user_id', id).eq('password', pw).maybeSingle();
-            if(data) {
-                currentUser = data;
-                document.getElementById('login-screen').style.display='none';
-                document.getElementById('sidebar').style.display='block';
-                document.getElementById('main-content').style.display='block';
-                document.getElementById('display-user').innerText = `User: ${data.user_id}`;
-                if(window.innerWidth <= 768) document.getElementById('mobile-nav').style.display = 'flex';
-                showScreen('dashboard');
-            } else alert('Login Failed');
-        };
-
-        document.getElementById('btn-logout').onclick = () => location.reload();
     </script>
 </body>
 </html>
