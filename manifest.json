@@ -1,0 +1,15 @@
+{
+  "name": "Video Manager",
+  "short_name": "VideoMgr",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#e0e5ec",
+  "theme_color": "#4b7cf3",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1179/1179069.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
