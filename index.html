@@ -58,7 +58,6 @@
         .stat-val { font-size: 2em; font-weight: bold; color: var(--accent-color); }
         hr { border: none; height: 1px; background: rgba(0,0,0,0.1); margin: 20px 0; }
 
-        /* Mobile Layout */
         @media (max-width: 768px) {
             body { flex-direction: column; }
             #sidebar { position: fixed; left: -280px; top: 0; z-index: 1000; height: 100vh; width: 240px; display: block !important; transition: 0.3s; }
@@ -67,21 +66,15 @@
             #main-content { padding: 15px; }
             .mobile-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--bg-color); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
             .header-pc { display: none; }
-
             .stats-grid { grid-template-columns: 1fr; gap: 15px; }
-
             table, thead, tbody, th, td, tr { display: block; }
             thead { display: none; }
             tr { margin-bottom: 25px; padding: 0; border-radius: 20px; box-shadow: var(--nm-flat); overflow: hidden; background: var(--bg-color); }
-            
-            td[data-label="Video Title"] {
-                padding: 15px; text-align: left; background: rgba(0,0,0,0.03); border-bottom: 1px solid rgba(0,0,0,0.05); font-weight: bold; font-size: 1.1em;
-            }
-
+            td[data-label="Video Title"] { padding: 15px; text-align: left; background: rgba(0,0,0,0.03); border-bottom: 1px solid rgba(0,0,0,0.05); font-weight: bold; font-size: 1.1em; }
             td { padding: 10px 15px; text-align: right; border: none; font-size: 0.9em; display: flex; justify-content: space-between; align-items: center; }
             td::before { content: attr(data-label); font-weight: bold; color: var(--sub-text); font-size: 0.85em; margin-right: 10px; }
-            
             td[data-label="Action"] { border-top: 1px solid rgba(0,0,0,0.05); justify-content: flex-end; gap: 10px; }
+            #video-screen .nm-card > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; gap: 10px !important; }
         }
 
         #login-screen { width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; }
@@ -160,7 +153,7 @@
                 </div>
                 <hr>
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="search-box" class="nm-input" placeholder="Search by Title or URL...">
+                    <input type="text" id="search-box" class="nm-input" placeholder="Title, URL, Actor, Categoryで検索...">
                     <select id="filter-actor" class="nm-input" style="width: 150px;"><option value="">All Actors</option></select>
                 </div>
             </div>
@@ -244,10 +237,22 @@
         function filterVideos() {
             const word = document.getElementById('search-box').value.toLowerCase();
             const aid = document.getElementById('filter-actor').value;
-            const filtered = allVideos.filter(v => 
-                (v.url.toLowerCase().includes(word) || (v.video_title && v.video_title.toLowerCase().includes(word))) && 
-                (!aid || v.actor_id == aid)
-            );
+
+            const filtered = allVideos.filter(v => {
+                // セレクトボックスの俳優フィルタ
+                const matchActorSelect = !aid || v.actor_id == aid;
+
+                // キーワード検索（タイトル、URL、俳優名、カテゴリ名を統合）
+                const vTitle = (v.video_title || "").toLowerCase();
+                const vUrl = (v.url || "").toLowerCase();
+                const vActor = (actors[v.actor_id] || "").toLowerCase();
+                const vCat = (cats[v.category_id] || "").toLowerCase();
+
+                const matchKeyword = vTitle.includes(word) || vUrl.includes(word) || vActor.includes(word) || vCat.includes(word);
+
+                return matchActorSelect && matchKeyword;
+            });
+
             document.querySelector('#table-video tbody').innerHTML = filtered.map(v => `
                 <tr>
                     <td data-label="Video Title" class="td-title">${v.video_title || '(No Title)'}</td>
@@ -313,15 +318,15 @@
 
         async function loadDashboard() {
             const { data } = await db.from('url').select('*').order('created_at', {ascending: false});
-            document.getElementById('stat-video').innerText = data.length;
-            document.getElementById('stat-actor').innerText = Object.keys(actors).length;
-            document.getElementById('stat-cat').innerText = Object.keys(cats).length;
-            document.getElementById('table-recent').querySelector('tbody').innerHTML = data.slice(0, 5).map(v => `<tr><td class="td-title">${v.video_title || '(No Title)'}</td><td class="td-url">${v.url}</td><td>${fmtDate(v.created_at)}</td></tr>`).join('');
+            document.getElementById('stat-video').innerText = data.length || 0;
+            document.getElementById('stat-actor').innerText = Object.keys(actors).length || 0;
+            document.getElementById('stat-cat').innerText = Object.keys(cats).length || 0;
+            document.getElementById('table-recent').querySelector('tbody').innerHTML = (data || []).slice(0, 5).map(v => `<tr><td class="td-title">${v.video_title || '(No Title)'}</td><td class="td-url">${v.url}</td><td>${fmtDate(v.created_at)}</td></tr>`).join('');
         }
 
         async function loadCategories() {
             const { data } = await db.from('m_category').select('*');
-            document.querySelector('#table-category tbody').innerHTML = data.map(c => `<tr><td data-label="名前">${c.category_name}</td><td data-label="更新日">${fmtDate(c.updated_at)}</td><td data-label="更新者">${userCache[c.updater_id]}</td></tr>`).join('');
+            document.querySelector('#table-category tbody').innerHTML = data.map(c => `<tr><td data-label="Category">${c.category_name}</td><td data-label="Updated">${fmtDate(c.updated_at)}</td><td data-label="By">${userCache[c.updater_id]}</td></tr>`).join('');
         }
 
         document.getElementById('btn-login').onclick = async () => {
