@@ -50,14 +50,15 @@
 
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85em; }
-        .td-url { word-break: break-all; color: var(--accent-color); text-decoration: none; }
+        .td-url { word-break: break-all; color: var(--accent-color); text-decoration: none; font-size: 0.8em; }
+        .td-title { font-weight: bold; }
 
         .header-pc { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
         .stat-val { font-size: 2em; font-weight: bold; color: var(--accent-color); }
         hr { border: none; height: 1px; background: rgba(0,0,0,0.1); margin: 20px 0; }
 
-        /* Mobile Layout Optimizations */
+        /* Mobile Layout */
         @media (max-width: 768px) {
             body { flex-direction: column; }
             #sidebar { position: fixed; left: -280px; top: 0; z-index: 1000; height: 100vh; width: 240px; display: block !important; transition: 0.3s; }
@@ -73,15 +74,14 @@
             thead { display: none; }
             tr { margin-bottom: 25px; padding: 0; border-radius: 20px; box-shadow: var(--nm-flat); overflow: hidden; background: var(--bg-color); }
             
-            td[data-label="URL"] {
-                padding: 15px; text-align: left; background: rgba(0,0,0,0.03); border-bottom: 1px solid rgba(0,0,0,0.05); font-weight: bold;
+            td[data-label="Video Title"] {
+                padding: 15px; text-align: left; background: rgba(0,0,0,0.03); border-bottom: 1px solid rgba(0,0,0,0.05); font-weight: bold; font-size: 1.1em;
             }
-            td[data-label="URL"]::before { content: "🔗 URL: "; }
 
             td { padding: 10px 15px; text-align: right; border: none; font-size: 0.9em; display: flex; justify-content: space-between; align-items: center; }
             td::before { content: attr(data-label); font-weight: bold; color: var(--sub-text); font-size: 0.85em; margin-right: 10px; }
             
-            td[data-label="操作"] { border-top: 1px solid rgba(0,0,0,0.05); justify-content: flex-end; gap: 10px; }
+            td[data-label="Action"] { border-top: 1px solid rgba(0,0,0,0.05); justify-content: flex-end; gap: 10px; }
         }
 
         #login-screen { width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; }
@@ -139,7 +139,7 @@
             <div class="nm-card">
                 <h4>Recent Uploads</h4>
                 <table id="table-recent">
-                    <thead><tr><th>URL</th><th>Created At</th></tr></thead>
+                    <thead><tr><th>Video Title</th><th>URL</th><th>Created At</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -148,8 +148,9 @@
         <section id="video-screen" class="screen">
             <div class="nm-card" style="margin-bottom: 25px;">
                 <h4 id="video-form-title">Registration</h4>
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; align-items: end;">
-                    <input type="text" id="new-url" class="nm-input" placeholder="Input URL">
+                <div style="display: grid; grid-template-columns: 1.5fr 1.5fr 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <input type="text" id="new-video-title" class="nm-input" placeholder="Video Title">
+                    <input type="text" id="new-url" class="nm-input" placeholder="URL">
                     <select id="select-actor" class="nm-input"></select>
                     <select id="select-category" class="nm-input"></select>
                     <div style="display: flex; gap: 5px;">
@@ -159,13 +160,13 @@
                 </div>
                 <hr>
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="search-box" class="nm-input" placeholder="Search by URL...">
+                    <input type="text" id="search-box" class="nm-input" placeholder="Search by Title or URL...">
                     <select id="filter-actor" class="nm-input" style="width: 150px;"><option value="">All Actors</option></select>
                 </div>
             </div>
             <div class="nm-card">
                 <table id="table-video">
-                    <thead><tr><th>URL</th><th>Actor</th><th>Category</th><th>Creator</th><th>Created</th><th>Updater</th><th>Updated</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Video Title</th><th>URL</th><th>Actor</th><th>Category</th><th>Creator</th><th>Created</th><th>Updater</th><th>Updated</th><th>Action</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -243,18 +244,22 @@
         function filterVideos() {
             const word = document.getElementById('search-box').value.toLowerCase();
             const aid = document.getElementById('filter-actor').value;
-            const filtered = allVideos.filter(v => v.url.toLowerCase().includes(word) && (!aid || v.actor_id == aid));
+            const filtered = allVideos.filter(v => 
+                (v.url.toLowerCase().includes(word) || (v.video_title && v.video_title.toLowerCase().includes(word))) && 
+                (!aid || v.actor_id == aid)
+            );
             document.querySelector('#table-video tbody').innerHTML = filtered.map(v => `
                 <tr>
+                    <td data-label="Video Title" class="td-title">${v.video_title || '(No Title)'}</td>
                     <td data-label="URL"><a href="${v.url}" target="_blank" class="td-url">${v.url}</a></td>
-                    <td data-label="出演者">${actors[v.actor_id] || '-'}</td>
-                    <td data-label="カテゴリ">${cats[v.category_id] || '-'}</td>
-                    <td data-label="作成者">${userCache[v.creator_id] || '-'}</td>
-                    <td data-label="作成日">${fmtDate(v.created_at)}</td>
-                    <td data-label="更新者">${userCache[v.updater_id] || '-'}</td>
-                    <td data-label="更新日">${fmtDate(v.updated_at)}</td>
-                    <td data-label="操作">
-                        <button class="nm-btn" style="padding:4px 8px;" onclick="editVideo(${v.id},'${v.url}',${v.actor_id},${v.category_id})">edit</button>
+                    <td data-label="Actor">${actors[v.actor_id] || '-'}</td>
+                    <td data-label="Category">${cats[v.category_id] || '-'}</td>
+                    <td data-label="Creator">${userCache[v.creator_id] || '-'}</td>
+                    <td data-label="Created">${fmtDate(v.created_at)}</td>
+                    <td data-label="Updater">${userCache[v.updater_id] || '-'}</td>
+                    <td data-label="Updated">${fmtDate(v.updated_at)}</td>
+                    <td data-label="Action">
+                        <button class="nm-btn" style="padding:4px 8px;" onclick="editVideo(${v.id},'${v.url}',${v.actor_id},${v.category_id},'${v.video_title || ''}')">edit</button>
                         <button class="nm-btn" style="padding:4px 8px;color:var(--danger-color);" onclick="deleteVideo(${v.id})">delete</button>
                     </td>
                 </tr>`).join('');
@@ -263,26 +268,36 @@
         document.getElementById('filter-actor').onchange = filterVideos;
 
         document.getElementById('btn-add-video').onclick = async () => {
-            const url = document.getElementById('new-url').value; if(!url) return;
+            const url = document.getElementById('new-url').value;
+            const title = document.getElementById('new-video-title').value;
+            if(!url) return;
             if(!editingVideoId) { const { data } = await db.from('url').select('id').eq('url', url).maybeSingle(); if(data) return alert('Registered URL'); }
             const now = new Date().toISOString();
-            const p = { url, actor_id: document.getElementById('select-actor').value, category_id: document.getElementById('select-category').value, updated_at: now, updater_id: currentUser.id };
+            const p = { url, video_title: title, actor_id: document.getElementById('select-actor').value, category_id: document.getElementById('select-category').value, updated_at: now, updater_id: currentUser.id };
             if(editingVideoId) await db.from('url').update(p).eq('id', editingVideoId);
             else await db.from('url').insert({...p, created_at: now, creator_id: currentUser.id});
             resetVideoForm(); loadVideos();
         };
 
-        window.editVideo = (id, url, aid, cid) => { editingVideoId = id; document.getElementById('new-url').value = url; document.getElementById('select-actor').value = aid; document.getElementById('select-category').value = cid; document.getElementById('btn-add-video').innerText = "update"; document.getElementById('btn-cancel-video').style.display = "inline-block"; };
+        window.editVideo = (id, url, aid, cid, title) => { 
+            editingVideoId = id; 
+            document.getElementById('new-url').value = url; 
+            document.getElementById('new-video-title').value = title;
+            document.getElementById('select-actor').value = aid; 
+            document.getElementById('select-category').value = cid; 
+            document.getElementById('btn-add-video').innerText = "update"; 
+            document.getElementById('btn-cancel-video').style.display = "inline-block"; 
+        };
         window.deleteVideo = async (id) => { if(confirm('Delete?')) { await db.from('url').delete().eq('id', id); loadVideos(); } };
-        function resetVideoForm() { editingVideoId = null; document.getElementById('new-url').value = ''; document.getElementById('btn-add-video').innerText = "add"; document.getElementById('btn-cancel-video').style.display = "none"; }
+        function resetVideoForm() { editingVideoId = null; document.getElementById('new-url').value = ''; document.getElementById('new-video-title').value = ''; document.getElementById('btn-add-video').innerText = "add"; document.getElementById('btn-cancel-video').style.display = "none"; }
         document.getElementById('btn-cancel-video').onclick = resetVideoForm;
 
         async function loadActors() {
             const { data } = await db.from('m_actor').select('*').order('created_at', {ascending: false});
             document.querySelector('#table-actor tbody').innerHTML = data.map(a => `
                 <tr>
-                    <td data-label="名前">${a.actor_name}</td><td data-label="登録日">${fmtDate(a.created_at)}</td><td data-label="登録者">${userCache[a.creator_id]}</td>
-                    <td data-label="操作"><button class="nm-btn" onclick="editActor(${a.id},'${a.actor_name}')">edit</button> <button class="nm-btn" style="color:var(--danger-color);" onclick="deleteActor(${a.id})">delete</button></td>
+                    <td data-label="Name">${a.actor_name}</td><td data-label="Date">${fmtDate(a.created_at)}</td><td data-label="By">${userCache[a.creator_id]}</td>
+                    <td data-label="Action"><button class="nm-btn" onclick="editActor(${a.id},'${a.actor_name}')">edit</button> <button class="nm-btn" style="color:var(--danger-color);" onclick="deleteActor(${a.id})">delete</button></td>
                 </tr>`).join('');
         }
         window.editActor = (id, name) => { editingActorId = id; document.getElementById('new-actor-name').value = name; document.getElementById('btn-add-actor').innerText = "update"; document.getElementById('btn-cancel-actor').style.display = "inline-block"; };
@@ -301,7 +316,7 @@
             document.getElementById('stat-video').innerText = data.length;
             document.getElementById('stat-actor').innerText = Object.keys(actors).length;
             document.getElementById('stat-cat').innerText = Object.keys(cats).length;
-            document.getElementById('table-recent').querySelector('tbody').innerHTML = data.slice(0, 5).map(v => `<tr><td class="td-url">${v.url}</td><td>${fmtDate(v.created_at)}</td></tr>`).join('');
+            document.getElementById('table-recent').querySelector('tbody').innerHTML = data.slice(0, 5).map(v => `<tr><td class="td-title">${v.video_title || '(No Title)'}</td><td class="td-url">${v.url}</td><td>${fmtDate(v.created_at)}</td></tr>`).join('');
         }
 
         async function loadCategories() {
