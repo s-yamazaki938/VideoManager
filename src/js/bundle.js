@@ -60,6 +60,15 @@ const VideoManager = (() => {
         async fetchCategories() {
             const { data } = await db.from('m_category').select('*');
             return data || [];
+        },
+        async addCategory(categoryData) {
+            return await db.from('m_category').insert(categoryData);
+        },
+        async updateCategory(id, categoryData) {
+            return await db.from('m_category').update(categoryData).eq('id', id);
+        },
+        async deleteCategory(id) {
+            return await db.from('m_category').delete().eq('id', id);
         }
     };
 
@@ -71,6 +80,7 @@ const VideoManager = (() => {
     let allVideos = [];
     let editingVideoId = null;
     let editingActorId = null;
+    let editingCategoryId = null;
 
     // --- UI ---
     const ui = {
@@ -315,7 +325,54 @@ const VideoManager = (() => {
                     <td data-label="Category">${c.category_name}</td>
                     <td data-label="Updated">${fmtDate(c.updated_at)}</td>
                     <td data-label="By">${userCache[c.updater_id] || '-'}</td>
+                    <td data-label="Action">
+                        <button class="nm-btn btn-edit-category" data-id="${c.id}" data-name="${c.category_name}">edit</button>
+                        <button class="nm-btn btn-delete-category" data-id="${c.id}" style="color:var(--danger-color);">delete</button>
+                    </td>
                 </tr>`).join('');
+
+            tbody.querySelectorAll('.btn-edit-category').forEach(btn => {
+                btn.onclick = () => ui.editCategory(btn.dataset.id, btn.dataset.name);
+            });
+            tbody.querySelectorAll('.btn-delete-category').forEach(btn => {
+                btn.onclick = () => ui.deleteCategory(btn.dataset.id);
+            });
+        },
+
+        editCategory(id, name) {
+            editingCategoryId = id;
+            document.getElementById('new-category-name').value = name;
+            document.getElementById('btn-add-category').innerText = "update";
+            document.getElementById('btn-cancel-category').style.display = "inline-block";
+        },
+
+        async handleAddCategory() {
+            const name = document.getElementById('new-category-name').value;
+            if (!name) return;
+            const now = new Date().toISOString();
+
+            if (editingCategoryId) {
+                await api.updateCategory(editingCategoryId, { category_name: name, updated_at: now, updater_id: currentUser.id });
+            } else {
+                await api.addCategory({ category_name: name, created_at: now, updated_at: now, creator_id: currentUser.id, updater_id: currentUser.id });
+            }
+            ui.resetCategoryForm();
+            await ui.loadCategories();
+        },
+
+        async deleteCategory(id) {
+            if (confirm('Delete?')) {
+                const { error } = await api.deleteCategory(id);
+                if (error) alert('Linked to video');
+                else await ui.loadCategories();
+            }
+        },
+
+        resetCategoryForm() {
+            editingCategoryId = null;
+            document.getElementById('new-category-name').value = '';
+            document.getElementById('btn-add-category').innerText = "add";
+            document.getElementById('btn-cancel-category').style.display = "none";
         },
 
         setupGlobalEvents() {
@@ -358,6 +415,13 @@ const VideoManager = (() => {
 
             const btnCancelActor = document.getElementById('btn-cancel-actor');
             if (btnCancelActor) btnCancelActor.onclick = ui.resetActorForm;
+
+            // Category Screen Events
+            const btnAddCategory = document.getElementById('btn-add-category');
+            if (btnAddCategory) btnAddCategory.onclick = ui.handleAddCategory;
+
+            const btnCancelCategory = document.getElementById('btn-cancel-category');
+            if (btnCancelCategory) btnCancelCategory.onclick = ui.resetCategoryForm;
         }
     };
 
