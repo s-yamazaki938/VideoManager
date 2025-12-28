@@ -13,6 +13,33 @@ const VideoManager = (() => {
         });
     };
 
+    const getThumbnailUrl = (url) => {
+        if (!url) return null;
+        try {
+            const urlObj = new URL(url);
+            // YouTube
+            if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+                let vid = '';
+                if (urlObj.hostname.includes('youtu.be')) vid = urlObj.pathname.slice(1);
+                else vid = urlObj.searchParams.get('v');
+                if (vid) return `https://img.youtube.com/vi/${vid}/mqdefault.jpg`;
+            }
+            // Vimeo
+            if (urlObj.hostname.includes('vimeo.com')) {
+                const vid = urlObj.pathname.split('/').pop();
+                if (vid) return `https://vumbnail.com/${vid}.jpg`;
+            }
+            // DailyMotion
+            if (urlObj.hostname.includes('dailymotion.com') || urlObj.hostname.includes('dai.ly')) {
+                const vid = urlObj.pathname.split('/').pop();
+                if (vid) return `https://www.dailymotion.com/thumbnail/video/${vid}`;
+            }
+        } catch (e) { }
+
+        // Generic Fallback using Thum.io
+        return `https://image.thum.io/get/width/300/crop/600/${url}`;
+    };
+
     // --- Config & Supabase ---
     const SB_URL = 'https://tpemermrrxgdxppzewpn.supabase.co';
     const SB_KEY = 'sb_publishable_zr76EeMU58HUMoJJivdDoQ_Hflm3xX8';
@@ -157,6 +184,11 @@ const VideoManager = (() => {
             const tbody = document.querySelector('#table-recent tbody');
             tbody.innerHTML = allVideos.slice(0, 5).map(v => `
                 <tr>
+                    <td class="td-thumb" data-label="Preview">
+                        <div class="thumb-container">
+                            <img src="${getThumbnailUrl(v.url)}" class="thumb-img" onerror="this.src='https://via.placeholder.com/100x60?text=No+Image'">
+                        </div>
+                    </td>
                     <td class="td-title">${v.video_title || '(No Title)'}</td>
                     <td class="td-url">${v.url}</td>
                     <td>${fmtDate(v.created_at)}</td>
@@ -188,6 +220,11 @@ const VideoManager = (() => {
             const tbody = document.querySelector('#table-video tbody');
             tbody.innerHTML = filtered.map(v => `
                 <tr>
+                    <td class="td-thumb" data-label="Preview">
+                        <div class="thumb-container">
+                            <img src="${getThumbnailUrl(v.url)}" class="thumb-img" onerror="this.src='https://via.placeholder.com/100x60?text=No+Image'">
+                        </div>
+                    </td>
                     <td data-label="Video Title" class="td-title">${v.video_title || '(No Title)'}</td>
                     <td data-label="URL"><a href="${v.url}" target="_blank" class="td-url">${v.url}</a></td>
                     <td data-label="Actor">${actors[v.actor_id] || '-'}</td>
