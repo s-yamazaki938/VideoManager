@@ -145,6 +145,14 @@
         </section>
 
         <section id="category-screen" class="screen">
+            <div class="nm-card" style="margin-bottom: 20px;">
+                <h4 id="category-form-title">Category Registration</h4>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="new-category-name" class="nm-input" placeholder="Category Name">
+                    <button class="nm-btn" id="btn-add-category">add</button>
+                    <button class="nm-btn" id="btn-cancel-category" style="display:none;">cancel</button>
+                </div>
+            </div>
             <div class="nm-card">
                 <table id="table-category">
                     <thead>
@@ -152,6 +160,7 @@
                             <th>Category</th>
                             <th>Updated</th>
                             <th>By</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
