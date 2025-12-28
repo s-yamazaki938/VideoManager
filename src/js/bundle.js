@@ -124,10 +124,36 @@ const VideoManager = (() => {
         setInitialUser(user) {
             currentUser = user;
             ui.elements.displayUser.innerText = `Logged in as: ${currentUser.user_id}`;
+
+            // Load theme settings
+            const savedAccent = localStorage.getItem('accent-color') || '#4b7cf3';
+            ui.setAccentColor(savedAccent);
+            const picker = document.getElementById('accent-color-picker');
+            if (picker) {
+                picker.value = savedAccent;
+                picker.oninput = (e) => ui.setAccentColor(e.target.value);
+            }
+
             ui.elements.loadingOverlay.style.display = 'none';
             ui.elements.sidebar.style.display = 'block';
             ui.elements.mainContent.style.display = 'block';
             if (window.innerWidth <= 768) ui.elements.mobileHeader.style.display = 'flex';
+        },
+
+        setAccentColor(color) {
+            document.documentElement.style.setProperty('--accent-color', color);
+            localStorage.setItem('accent-color', color);
+        },
+
+        showSkeleton(targetId, rowCount = 5) {
+            const tbody = document.querySelector(`#${targetId} tbody`);
+            if (!tbody) return;
+            const colCount = document.querySelectorAll(`#${targetId} thead th`).length;
+            tbody.innerHTML = Array(rowCount).fill(0).map(() => `
+                <tr class="skeleton-row">
+                    ${Array(colCount).fill(0).map(() => `<td><div class="skeleton-pulse"></div></td>`).join('')}
+                </tr>
+            `).join('');
         },
 
         toggleTheme() {
@@ -136,9 +162,15 @@ const VideoManager = (() => {
         },
 
         async showScreen(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.screen').forEach(s => {
+                s.classList.remove('active');
+                s.classList.remove('fade-in');
+            });
             const screen = document.getElementById(id + '-screen');
-            if (screen) screen.classList.add('active');
+            if (screen) {
+                screen.classList.add('active');
+                screen.classList.add('fade-in');
+            }
 
             const titles = {
                 dashboard: 'Dashboard',
@@ -176,6 +208,7 @@ const VideoManager = (() => {
         },
 
         async loadDashboard() {
+            ui.showSkeleton('table-recent', 5);
             allVideos = await api.fetchVideos();
             document.getElementById('stat-video').innerText = allVideos.length;
             document.getElementById('stat-actor').innerText = Object.keys(actors).length;
@@ -218,8 +251,14 @@ const VideoManager = (() => {
             });
 
             const tbody = document.querySelector('#table-video tbody');
-            tbody.innerHTML = filtered.map(v => `
-                <tr>
+            tbody.innerHTML = ''; // Clear previous
+            ui.showSkeleton('table-video', 8);
+
+            // Simulation of async filtering/rendering or just immediate if fast
+            setTimeout(() => {
+                const tbodyFinal = document.querySelector('#table-video tbody');
+                tbodyFinal.innerHTML = filtered.map(v => `
+                    <tr class="fade-in">
                     <td class="td-thumb" data-label="Preview">
                         <div class="thumb-container">
                             <img src="${getThumbnailUrl(v.url)}" class="thumb-img" onerror="this.src='https://via.placeholder.com/100x60?text=No+Image'">
@@ -239,12 +278,13 @@ const VideoManager = (() => {
                     </td>
                 </tr>`).join('');
 
-            tbody.querySelectorAll('.btn-edit-video').forEach(btn => {
-                btn.onclick = () => ui.editVideo(btn.dataset.id, btn.dataset.url, btn.dataset.aid, btn.dataset.cid, btn.dataset.title);
-            });
-            tbody.querySelectorAll('.btn-delete-video').forEach(btn => {
-                btn.onclick = () => ui.deleteVideo(btn.dataset.id);
-            });
+                tbody.querySelectorAll('.btn-edit-video').forEach(btn => {
+                    btn.onclick = () => ui.editVideo(btn.dataset.id, btn.dataset.url, btn.dataset.aid, btn.dataset.cid, btn.dataset.title);
+                });
+                tbody.querySelectorAll('.btn-delete-video').forEach(btn => {
+                    btn.onclick = () => ui.deleteVideo(btn.dataset.id);
+                });
+            }, 300);
         },
 
         editVideo(id, url, aid, cid, title) {
