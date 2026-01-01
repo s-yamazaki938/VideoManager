@@ -88,19 +88,17 @@
             <div class="nm-card" style="margin-bottom: 25px;">
                 <h4 id="video-form-title">Registration</h4>
                 <div
-                    style="display: grid; grid-template-columns: 1.5fr 1.5fr 1.2fr 1fr auto; gap: 10px; align-items: end;">
+                    style="display: grid; grid-template-columns: 1.5fr 1.5fr 1fr auto 1fr auto; gap: 10px; align-items: end;">
                     <input type="text" id="new-video-title" class="nm-input" placeholder="Video Title">
                     <input type="text" id="new-url" class="nm-input" placeholder="URL">
-                    <div style="display: flex; align-items: end; gap: 5px;">
-                        <div id="custom-select-actor" class="custom-select-container">
-                            <div class="custom-select-display nm-input">
-                                <span class="custom-select-placeholder">Select Actor(s)</span>
-                                <div class="custom-select-chips"></div>
-                            </div>
-                            <div class="custom-select-options nm-card"></div>
+                    <div id="custom-select-actor" class="custom-select-container">
+                        <div class="custom-select-display nm-input">
+                            <span class="custom-select-placeholder">Select Actor(s)</span>
+                            <div class="custom-select-chips"></div>
                         </div>
-                        <button id="btn-show-actor-modal" class="nm-btn" title="Add New Actor" style="padding: 10px; flex-shrink: 0;">+</button>
+                        <div class="custom-select-options nm-card"></div>
                     </div>
+                    <button id="btn-show-actor-modal" class="nm-btn" title="Add New Actor" style="padding: 10px; flex-shrink: 0;">+</button>
                     <div id="custom-select-category" class="custom-select-container">
                         <div class="custom-select-display nm-input">
                             <span class="custom-select-placeholder">Select Category(s)</span>
