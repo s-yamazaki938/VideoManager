@@ -793,13 +793,13 @@ window.addEventListener('DOMContentLoaded', () => {
     const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     if (isMobile()) {
-        const inputs = document.querySelectorAll('input, textarea, select');
-        inputs.forEach(input => {
-            input.addEventListener('focus', () => {
+        document.body.addEventListener('focusin', (event) => {
+            const target = event.target;
+            if (target.matches('input, textarea, select')) {
                 setTimeout(() => {
-                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }, 300);
-            });
+            }
         });
     }
 });
