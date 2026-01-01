@@ -88,10 +88,13 @@
             <div class="nm-card" style="margin-bottom: 25px;">
                 <h4 id="video-form-title">Registration</h4>
                 <div
-                    style="display: grid; grid-template-columns: 1.5fr 1.5fr 1fr 1fr auto; gap: 10px; align-items: end;">
+                    style="display: grid; grid-template-columns: 1.5fr 1.5fr 1.2fr 1fr auto; gap: 10px; align-items: end;">
                     <input type="text" id="new-video-title" class="nm-input" placeholder="Video Title">
                     <input type="text" id="new-url" class="nm-input" placeholder="URL">
-                    <select id="select-actor" class="nm-input"></select>
+                    <div style="display: flex; align-items: end; gap: 5px;">
+                        <select id="select-actor" class="nm-input" style="width: 100%;"></select>
+                        <button id="btn-show-actor-modal" class="nm-btn" title="Add New Actor" style="padding: 10px; flex-shrink: 0;">+</button>
+                    </div>
                     <select id="select-category" class="nm-input"></select>
                     <div style="display: flex; gap: 5px;">
                         <button class="nm-btn" id="btn-add-video">add</button>
@@ -177,6 +180,20 @@
     </main>
 
     <script src="src/js/bundle.js"></script>
+
+    <!-- Actor Registration Modal -->
+    <div id="actor-modal" class="menu-overlay" style="display: none; align-items: center; justify-content: center; z-index: 1001;">
+        <div class="nm-card" style="width: 90%; max-width: 400px; margin: 0;">
+            <h4>新規出演者登録</h4>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                <input type="text" id="modal-new-actor-name" class="nm-input" placeholder="Actor Name">
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="nm-btn" id="btn-modal-cancel-actor">キャンセル</button>
+                    <button class="nm-btn" id="btn-modal-add-actor" style="background-color: var(--accent-color); color: white;">登録</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

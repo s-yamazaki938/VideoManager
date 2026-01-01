@@ -366,8 +366,30 @@ const VideoManager = (() => {
         },
 
         async handleAddActor() {
-            const name = document.getElementById('new-actor-name').value;
+            const name = document.getElementById('new-actor-name').value.trim();
             if (!name) return;
+
+            const lowerCaseName = name.toLowerCase();
+            let isDuplicate = false;
+
+            if (editingActorId) {
+                // In edit mode, check if the new name matches another existing actor's name
+                for (const id in actors) {
+                    if (id !== editingActorId && actors[id].toLowerCase() === lowerCaseName) {
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+            } else {
+                // In add mode, check if the name exists at all
+                isDuplicate = Object.values(actors).some(actorName => actorName.toLowerCase() === lowerCaseName);
+            }
+
+            if (isDuplicate) {
+                alert('エラー: 同じ名前の出演者が既に登録されています。');
+                return;
+            }
+            
             const now = new Date().toISOString();
 
             if (editingActorId) {
@@ -377,6 +399,7 @@ const VideoManager = (() => {
             }
             ui.resetActorForm();
             await ui.loadActors();
+            await ui.refreshData(); // Refresh dropdowns as well
         },
 
         async deleteActor(id) {
@@ -452,6 +475,33 @@ const VideoManager = (() => {
             document.getElementById('btn-cancel-category').style.display = "none";
         },
 
+        async handleModalAddActor() {
+            const nameInput = document.getElementById('modal-new-actor-name');
+            const name = nameInput.value.trim();
+            if (!name) return;
+
+            const lowerCaseName = name.toLowerCase();
+            const isDuplicate = Object.values(actors).some(actorName => actorName.toLowerCase() === lowerCaseName);
+
+            if (isDuplicate) {
+                alert('エラー: 同じ名前の出演者が既に登録されています。');
+                return;
+            }
+
+            const now = new Date().toISOString();
+            await api.addActor({ actor_name: name, created_at: now, updated_at: now, creator_id: currentUser.id, updater_id: currentUser.id });
+            
+            nameInput.value = ''; // Clear input
+            document.getElementById('actor-modal').style.display = 'none'; // Close modal
+            
+            await ui.refreshData(); // Refresh dropdowns
+            
+            // If on actor screen, refresh the table as well
+            if (document.getElementById('actor-screen').classList.contains('active')) {
+                await ui.loadActors();
+            }
+        },
+
         setupGlobalEvents() {
             ui.elements.sidebar.classList.remove('open');
             ui.elements.overlay.classList.remove('active');
@@ -499,6 +549,36 @@ const VideoManager = (() => {
 
             const btnCancelCategory = document.getElementById('btn-cancel-category');
             if (btnCancelCategory) btnCancelCategory.onclick = ui.resetCategoryForm;
+
+            // Actor Modal Events
+            const actorModal = document.getElementById('actor-modal');
+            const btnShowActorModal = document.getElementById('btn-show-actor-modal');
+            const btnModalCancelActor = document.getElementById('btn-modal-cancel-actor');
+            const btnModalAddActor = document.getElementById('btn-modal-add-actor');
+
+            if (btnShowActorModal) {
+                btnShowActorModal.onclick = () => {
+                    actorModal.style.display = 'flex';
+                };
+            }
+            if (btnModalCancelActor) {
+                btnModalCancelActor.onclick = () => {
+                    document.getElementById('modal-new-actor-name').value = '';
+                    actorModal.style.display = 'none';
+                };
+            }
+            if (btnModalAddActor) {
+                btnModalAddActor.onclick = ui.handleModalAddActor;
+            }
+            // Close modal when clicking outside of it
+            if (actorModal) {
+                actorModal.onclick = (e) => {
+                    if (e.target === actorModal) {
+                        document.getElementById('modal-new-actor-name').value = '';
+                        actorModal.style.display = 'none';
+                    }
+                };
+            }
         }
     };
 
