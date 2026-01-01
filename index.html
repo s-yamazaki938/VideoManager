@@ -92,10 +92,22 @@
                     <input type="text" id="new-video-title" class="nm-input" placeholder="Video Title">
                     <input type="text" id="new-url" class="nm-input" placeholder="URL">
                     <div style="display: flex; align-items: end; gap: 5px;">
-                        <select id="select-actor" class="nm-input" style="width: 100%;"></select>
+                        <div id="custom-select-actor" class="custom-select-container">
+                            <div class="custom-select-display nm-input">
+                                <span class="custom-select-placeholder">Select Actor(s)</span>
+                                <div class="custom-select-chips"></div>
+                            </div>
+                            <div class="custom-select-options nm-card"></div>
+                        </div>
                         <button id="btn-show-actor-modal" class="nm-btn" title="Add New Actor" style="padding: 10px; flex-shrink: 0;">+</button>
                     </div>
-                    <select id="select-category" class="nm-input"></select>
+                    <div id="custom-select-category" class="custom-select-container">
+                        <div class="custom-select-display nm-input">
+                            <span class="custom-select-placeholder">Select Category(s)</span>
+                            <div class="custom-select-chips"></div>
+                        </div>
+                        <div class="custom-select-options nm-card"></div>
+                    </div>
                     <div style="display: flex; gap: 5px;">
                         <button class="nm-btn" id="btn-add-video">add</button>
                         <button class="nm-btn" id="btn-cancel-video" style="display:none;">cancel</button>

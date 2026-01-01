@@ -200,7 +200,7 @@ body {
     flex: 1;
     padding: 20px;
     display: none;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 .mobile-header {
@@ -244,6 +244,7 @@ table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 15px;
+    table-layout: fixed;
 }
 
 th,
@@ -252,6 +253,7 @@ td {
     text-align: left;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     font-size: 0.85em;
+    word-wrap: break-word;
 }
 
 .td-url {
@@ -458,4 +460,83 @@ hr {
         flex-direction: column;
         gap: 10px;
     }
+}
+
+/* Custom Multi-Select */
+.custom-select-container {
+    position: relative;
+    width: 100%;
+}
+
+.custom-select-display {
+    min-height: 42px; /* Match nm-input padding + line-height */
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.custom-select-placeholder {
+    color: var(--sub-text);
+    font-size: 0.9em;
+    padding: 0 2px;
+}
+
+.custom-select-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.custom-select-chip {
+    background: var(--accent-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.custom-select-chip .remove-chip {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.custom-select-options {
+    display: none;
+    position: absolute;
+    top: 105%;
+    left: 0;
+    width: 100%;
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.custom-select-options.open {
+    display: block;
+}
+
+.custom-select-option {
+    display: block;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.custom-select-option:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+[data-theme="dark"] .custom-select-option:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.custom-select-option input {
+    margin-right: 10px;
 }

@@ -59,16 +59,78 @@ const VideoManager = (() => {
             return await db.from('m_user').select('*').eq('user_id', 'admin').maybeSingle();
         },
         async fetchVideos() {
-            const { data } = await db.from('url').select('*').order('created_at', { ascending: false });
+            const { data } = await db.from('url').select(`
+                id, url, video_title, created_at, creator_id, updated_at, updater_id,
+                url_actors ( actor_id, m_actor (id, actor_name) ),
+                url_categories ( category_id, m_category (id, category_name) )
+            `).order('created_at', { ascending: false });
             return data || [];
         },
         async addVideo(videoData) {
-            return await db.from('url').insert(videoData);
+            // 1. urlテーブルに基本情報を登録し、新しいIDを取得
+            const { data: urlData, error: urlError } = await db.from('url').insert({
+                url: videoData.url,
+                video_title: videoData.video_title,
+                created_at: videoData.created_at,
+                creator_id: videoData.creator_id,
+                updated_at: videoData.updated_at,
+                updater_id: videoData.updater_id
+            }).select().single();
+
+            if (urlError) {
+                console.error('Error adding video:', urlError);
+                return { error: urlError };
+            }
+            const newUrlId = urlData.id;
+
+            // 2. url_actorsに関連を登録
+            if (videoData.actor_ids && videoData.actor_ids.length > 0) {
+                const actorLinks = videoData.actor_ids.map(actor_id => ({ url_id: newUrlId, actor_id }));
+                const { error } = await db.from('url_actors').insert(actorLinks);
+                if (error) return { error }; // エラー時はここで中断
+            }
+
+            // 3. url_categoriesに関連を登録
+            if (videoData.category_ids && videoData.category_ids.length > 0) {
+                const categoryLinks = videoData.category_ids.map(category_id => ({ url_id: newUrlId, category_id }));
+                const { error } = await db.from('url_categories').insert(categoryLinks);
+                if (error) return { error }; // エラー時はここで中断
+            }
+
+            return { data: urlData, error: null };
         },
         async updateVideo(id, videoData) {
-            return await db.from('url').update(videoData).eq('id', id);
+            // 1. urlテーブルの基本情報を更新
+            const { error: updateError } = await db.from('url').update({
+                url: videoData.url,
+                video_title: videoData.video_title,
+                updated_at: videoData.updated_at,
+                updater_id: videoData.updater_id
+            }).eq('id', id);
+
+            if (updateError) return { error: updateError };
+
+            // 2. 既存の関連を中間テーブルから削除
+            await db.from('url_actors').delete().eq('url_id', id);
+            await db.from('url_categories').delete().eq('url_id', id);
+
+            // 3. 新しい関連を登録 (addVideoと同様)
+            if (videoData.actor_ids && videoData.actor_ids.length > 0) {
+                const actorLinks = videoData.actor_ids.map(actor_id => ({ url_id: id, actor_id }));
+                const { error } = await db.from('url_actors').insert(actorLinks);
+                if (error) return { error };
+            }
+
+            if (videoData.category_ids && videoData.category_ids.length > 0) {
+                const categoryLinks = videoData.category_ids.map(category_id => ({ url_id: id, category_id }));
+                const { error } = await db.from('url_categories').insert(categoryLinks);
+                if (error) return { error };
+            }
+
+            return { error: null };
         },
         async deleteVideo(id) {
+            // DB側でON DELETE CASCADEを設定済みのため、urlを削除すれば中間テーブルのデータも自動で削除される
             return await db.from('url').delete().eq('id', id);
         },
         async fetchActors() {
@@ -190,21 +252,87 @@ const VideoManager = (() => {
             if (id === 'actor') await ui.loadActors();
             if (id === 'category') await ui.loadCategories();
         },
+        
+        // --- Custom Select Logic ---
+        createCustomSelect(type) {
+            const container = document.getElementById(`custom-select-${type}`);
+            const display = container.querySelector('.custom-select-display');
+            const optionsContainer = container.querySelector('.custom-select-options');
+
+            display.addEventListener('click', () => {
+                optionsContainer.classList.toggle('open');
+            });
+
+            // Close when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!container.contains(e.target)) {
+                    optionsContainer.classList.remove('open');
+                }
+            });
+        },
+
+        updateCustomSelectState(type) {
+            const container = document.getElementById(`custom-select-${type}`);
+            const chipsContainer = container.querySelector('.custom-select-chips');
+            const placeholder = container.querySelector('.custom-select-placeholder');
+            const selectedCheckboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+            
+            chipsContainer.innerHTML = '';
+            selectedCheckboxes.forEach(checkbox => {
+                const chip = document.createElement('div');
+                chip.className = 'custom-select-chip';
+                chip.textContent = checkbox.nextElementSibling.textContent;
+                const removeBtn = document.createElement('span');
+                removeBtn.className = 'remove-chip';
+                removeBtn.textContent = '×';
+                removeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    checkbox.checked = false;
+                    ui.updateCustomSelectState(type);
+                };
+                chip.appendChild(removeBtn);
+                chipsContainer.appendChild(chip);
+            });
+
+            placeholder.style.display = selectedCheckboxes.length > 0 ? 'none' : 'block';
+        },
 
         async refreshData() {
-            const { users, actors: actorList, categories } = await api.fetchInitialData();
+            const { users, actors: actorList, categories: categoryList } = await api.fetchInitialData();
             userCache = Object.fromEntries(users.map(i => [i.id, i.user_id]));
             actors = Object.fromEntries(actorList.map(i => [i.id, i.actor_name]));
-            cats = Object.fromEntries(categories.map(i => [i.id, i.category_name]));
+            cats = Object.fromEntries(categoryList.map(i => [i.id, i.category_name]));
 
-            const aOpts = actorList.map(i => `<option value="${i.id}">${i.actor_name}</option>`).join('');
-            const selectActor = document.getElementById('select-actor');
+            // Populate custom actor select
+            const actorOptionsContainer = document.querySelector('#custom-select-actor .custom-select-options');
+            actorOptionsContainer.innerHTML = actorList.map(i => `
+                <label class="custom-select-option">
+                    <input type="checkbox" value="${i.id}">
+                    <span>${i.actor_name}</span>
+                </label>
+            `).join('');
+            actorOptionsContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.onchange = () => ui.updateCustomSelectState('actor');
+            });
+
+            // Populate custom category select
+            const categoryOptionsContainer = document.querySelector('#custom-select-category .custom-select-options');
+            categoryOptionsContainer.innerHTML = categoryList.map(i => `
+                <label class="custom-select-option">
+                    <input type="checkbox" value="${i.id}">
+                    <span>${i.category_name}</span>
+                </label>
+            `).join('');
+            categoryOptionsContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.onchange = () => ui.updateCustomSelectState('category');
+            });
+            
+            // Populate filter dropdown (standard select is fine here)
             const filterActor = document.getElementById('filter-actor');
-            const selectCategory = document.getElementById('select-category');
-
-            if (selectActor) selectActor.innerHTML = aOpts;
-            if (filterActor) filterActor.innerHTML = '<option value="">All Actors</option>' + aOpts;
-            if (selectCategory) selectCategory.innerHTML = categories.map(i => `<option value="${i.id}">${i.category_name}</option>`).join('');
+            if (filterActor) {
+                const aOpts = actorList.map(i => `<option value="${i.id}">${i.actor_name}</option>`).join('');
+                filterActor.innerHTML = '<option value="">All Actors</option>' + aOpts;
+            }
         },
 
         async loadDashboard() {
@@ -242,12 +370,21 @@ const VideoManager = (() => {
             const aid = filterActor.value;
 
             const filtered = allVideos.filter(v => {
-                const matchActorSelect = !aid || v.actor_id == aid;
+                const matchActorSelect = !aid || (v.url_actors && v.url_actors.some(ua => ua.actor_id == aid));
+
                 const vTitle = (v.video_title || "").toLowerCase();
                 const vUrl = (v.url || "").toLowerCase();
-                const vActor = (actors[v.actor_id] || "").toLowerCase();
-                const vCat = (cats[v.category_id] || "").toLowerCase();
-                return matchActorSelect && (vTitle.includes(word) || vUrl.includes(word) || vActor.includes(word) || vCat.includes(word));
+                const vActors = v.url_actors ? v.url_actors.map(ua => ua.m_actor.actor_name.toLowerCase()) : [];
+                const vCats = v.url_categories ? v.url_categories.map(uc => uc.m_category.category_name.toLowerCase()) : [];
+                
+                const searchMatch = (
+                    vTitle.includes(word) ||
+                    vUrl.includes(word) ||
+                    vActors.some(name => name.includes(word)) ||
+                    vCats.some(name => name.includes(word))
+                );
+
+                return matchActorSelect && searchMatch;
             });
 
             const tbody = document.querySelector('#table-video tbody');
@@ -257,7 +394,11 @@ const VideoManager = (() => {
             // Simulation of async filtering/rendering or just immediate if fast
             setTimeout(() => {
                 const tbodyFinal = document.querySelector('#table-video tbody');
-                tbodyFinal.innerHTML = filtered.map(v => `
+                tbodyFinal.innerHTML = filtered.map(v => {
+                    const actorNames = v.url_actors && v.url_actors.length > 0 ? v.url_actors.map(ua => ua.m_actor.actor_name).join(', ') : '-';
+                    const categoryNames = v.url_categories && v.url_categories.length > 0 ? v.url_categories.map(uc => uc.m_category.category_name).join(', ') : '-';
+
+                    return `
                     <tr class="fade-in">
                     <td class="td-thumb" data-label="Preview">
                         <div class="thumb-container">
@@ -266,20 +407,21 @@ const VideoManager = (() => {
                     </td>
                     <td data-label="Video Title" class="td-title">${v.video_title || '(No Title)'}</td>
                     <td data-label="URL"><a href="${v.url}" target="_blank" class="td-url">${v.url}</a></td>
-                    <td data-label="Actor">${actors[v.actor_id] || '-'}</td>
-                    <td data-label="Category">${cats[v.category_id] || '-'}</td>
+                    <td data-label="Actor">${actorNames}</td>
+                    <td data-label="Category">${categoryNames}</td>
                     <td data-label="Creator">${userCache[v.creator_id] || '-'}</td>
                     <td data-label="Created">${fmtDate(v.created_at)}</td>
                     <td data-label="Updater">${userCache[v.updater_id] || '-'}</td>
                     <td data-label="Updated">${fmtDate(v.updated_at)}</td>
                     <td data-label="Action">
-                        <button class="nm-btn btn-edit-video" data-id="${v.id}" data-url="${v.url}" data-aid="${v.actor_id}" data-cid="${v.category_id}" data-title="${v.video_title || ''}" style="padding:4px 8px;">edit</button>
+                        <button class="nm-btn btn-edit-video" data-id="${v.id}" style="padding:4px 8px;">edit</button>
                         <button class="nm-btn btn-delete-video" data-id="${v.id}" style="padding:4px 8px;color:var(--danger-color);">delete</button>
                     </td>
-                </tr>`).join('');
+                </tr>`
+                }).join('');
 
                 tbody.querySelectorAll('.btn-edit-video').forEach(btn => {
-                    btn.onclick = () => ui.editVideo(btn.dataset.id, btn.dataset.url, btn.dataset.aid, btn.dataset.cid, btn.dataset.title);
+                    btn.onclick = () => ui.editVideo(btn.dataset.id);
                 });
                 tbody.querySelectorAll('.btn-delete-video').forEach(btn => {
                     btn.onclick = () => ui.deleteVideo(btn.dataset.id);
@@ -287,14 +429,29 @@ const VideoManager = (() => {
             }, 300);
         },
 
-        editVideo(id, url, aid, cid, title) {
+        editVideo(id) {
             editingVideoId = id;
-            document.getElementById('new-url').value = url;
-            document.getElementById('new-video-title').value = title;
-            document.getElementById('select-actor').value = aid;
-            document.getElementById('select-category').value = cid;
+            const video = allVideos.find(v => v.id == id);
+            if (!video) return;
+
+            document.getElementById('new-url').value = video.url;
+            document.getElementById('new-video-title').value = video.video_title || '';
+            
+            const actorIds = video.url_actors ? video.url_actors.map(ua => ua.actor_id.toString()) : [];
+            document.querySelectorAll('#custom-select-actor input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = actorIds.includes(checkbox.value);
+            });
+            ui.updateCustomSelectState('actor');
+
+            const categoryIds = video.url_categories ? video.url_categories.map(uc => uc.category_id.toString()) : [];
+            document.querySelectorAll('#custom-select-category input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = categoryIds.includes(checkbox.value);
+            });
+            ui.updateCustomSelectState('category');
+
             document.getElementById('btn-add-video').innerText = "update";
             document.getElementById('btn-cancel-video').style.display = "inline-block";
+            window.scrollTo(0, 0); // Scroll to top to see the form
         },
 
         async deleteVideo(id) {
@@ -309,20 +466,29 @@ const VideoManager = (() => {
             const title = document.getElementById('new-video-title').value;
             if (!url) return;
 
+            const actor_ids = Array.from(document.querySelectorAll('#custom-select-actor input:checked')).map(cb => cb.value);
+            const category_ids = Array.from(document.querySelectorAll('#custom-select-category input:checked')).map(cb => cb.value);
+
             const now = new Date().toISOString();
             const p = {
                 url,
                 video_title: title,
-                actor_id: document.getElementById('select-actor').value,
-                category_id: document.getElementById('select-category').value,
+                actor_ids,
+                category_ids,
                 updated_at: now,
                 updater_id: currentUser.id
             };
 
             if (editingVideoId) {
-                await api.updateVideo(editingVideoId, p);
+                const { error } = await api.updateVideo(editingVideoId, p);
+                if (error) {
+                    alert('Update failed: ' + error.message);
+                }
             } else {
-                await api.addVideo({ ...p, created_at: now, creator_id: currentUser.id });
+                const { error } = await api.addVideo({ ...p, created_at: now, creator_id: currentUser.id });
+                if (error) {
+                    alert('Add failed: ' + error.message);
+                }
             }
             ui.resetVideoForm();
             await ui.loadVideos();
@@ -332,6 +498,12 @@ const VideoManager = (() => {
             editingVideoId = null;
             document.getElementById('new-url').value = '';
             document.getElementById('new-video-title').value = '';
+
+            document.querySelectorAll('#custom-select-actor input:checked').forEach(cb => cb.checked = false);
+            document.querySelectorAll('#custom-select-category input:checked').forEach(cb => cb.checked = false);
+            ui.updateCustomSelectState('actor');
+            ui.updateCustomSelectState('category');
+
             document.getElementById('btn-add-video').innerText = "add";
             document.getElementById('btn-cancel-video').style.display = "none";
         },
@@ -535,6 +707,10 @@ const VideoManager = (() => {
 
             const filterActor = document.getElementById('filter-actor');
             if (filterActor) filterActor.onchange = ui.filterVideos;
+            
+            // Init custom selects
+            ui.createCustomSelect('actor');
+            ui.createCustomSelect('category');
 
             // Actor Screen Events
             const btnAddActor = document.getElementById('btn-add-actor');
