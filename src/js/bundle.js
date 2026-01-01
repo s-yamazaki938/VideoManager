@@ -787,3 +787,19 @@ const VideoManager = (() => {
 
 // Start App
 window.addEventListener('DOMContentLoaded', VideoManager.init);
+
+// --- Scroll into view on focus for mobile ---
+window.addEventListener('DOMContentLoaded', () => {
+    const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isMobile()) {
+        const inputs = document.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                setTimeout(() => {
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            });
+        });
+    }
+});
