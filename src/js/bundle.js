@@ -252,7 +252,7 @@ const VideoManager = (() => {
             if (id === 'actor') await ui.loadActors();
             if (id === 'category') await ui.loadCategories();
         },
-        
+
         // --- Custom Select Logic ---
         createCustomSelect(type) {
             const container = document.getElementById(`custom-select-${type}`);
@@ -276,7 +276,7 @@ const VideoManager = (() => {
             const chipsContainer = container.querySelector('.custom-select-chips');
             const placeholder = container.querySelector('.custom-select-placeholder');
             const selectedCheckboxes = container.querySelectorAll('input[type="checkbox"]:checked');
-            
+
             chipsContainer.innerHTML = '';
             selectedCheckboxes.forEach(checkbox => {
                 const chip = document.createElement('div');
@@ -326,7 +326,7 @@ const VideoManager = (() => {
             categoryOptionsContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
                 checkbox.onchange = () => ui.updateCustomSelectState('category');
             });
-            
+
             // Populate filter dropdown (standard select is fine here)
             const filterActor = document.getElementById('filter-actor');
             if (filterActor) {
@@ -376,7 +376,7 @@ const VideoManager = (() => {
                 const vUrl = (v.url || "").toLowerCase();
                 const vActors = v.url_actors ? v.url_actors.map(ua => ua.m_actor.actor_name.toLowerCase()) : [];
                 const vCats = v.url_categories ? v.url_categories.map(uc => uc.m_category.category_name.toLowerCase()) : [];
-                
+
                 const searchMatch = (
                     vTitle.includes(word) ||
                     vUrl.includes(word) ||
@@ -409,9 +409,7 @@ const VideoManager = (() => {
                     <td data-label="URL"><a href="${v.url}" target="_blank" class="td-url">${v.url}</a></td>
                     <td data-label="Actor">${actorNames}</td>
                     <td data-label="Category">${categoryNames}</td>
-                    <td data-label="Creator">${userCache[v.creator_id] || '-'}</td>
                     <td data-label="Created">${fmtDate(v.created_at)}</td>
-                    <td data-label="Updater">${userCache[v.updater_id] || '-'}</td>
                     <td data-label="Updated">${fmtDate(v.updated_at)}</td>
                     <td data-label="Action">
                         <button class="nm-btn btn-edit-video" data-id="${v.id}" style="padding:4px 8px;">edit</button>
@@ -436,7 +434,7 @@ const VideoManager = (() => {
 
             document.getElementById('new-url').value = video.url;
             document.getElementById('new-video-title').value = video.video_title || '';
-            
+
             const actorIds = video.url_actors ? video.url_actors.map(ua => ua.actor_id.toString()) : [];
             document.querySelectorAll('#custom-select-actor input[type="checkbox"]').forEach(checkbox => {
                 checkbox.checked = actorIds.includes(checkbox.value);
@@ -561,7 +559,7 @@ const VideoManager = (() => {
                 alert('エラー: 同じ名前の出演者が既に登録されています。');
                 return;
             }
-            
+
             const now = new Date().toISOString();
 
             if (editingActorId) {
@@ -662,12 +660,12 @@ const VideoManager = (() => {
 
             const now = new Date().toISOString();
             await api.addActor({ actor_name: name, created_at: now, updated_at: now, creator_id: currentUser.id, updater_id: currentUser.id });
-            
+
             nameInput.value = ''; // Clear input
             document.getElementById('actor-modal').style.display = 'none'; // Close modal
-            
+
             await ui.refreshData(); // Refresh dropdowns
-            
+
             // If on actor screen, refresh the table as well
             if (document.getElementById('actor-screen').classList.contains('active')) {
                 await ui.loadActors();
@@ -707,7 +705,7 @@ const VideoManager = (() => {
 
             const filterActor = document.getElementById('filter-actor');
             if (filterActor) filterActor.onchange = ui.filterVideos;
-            
+
             // Init custom selects
             ui.createCustomSelect('actor');
             ui.createCustomSelect('category');
